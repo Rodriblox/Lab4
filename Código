@@ -1,0 +1,85 @@
+#include <Arduino.h>
+
+// Pines para el LED RGB (cátodo común)
+const int pinRed   = 14;
+const int pinGreen = 26;
+const int pinBlue  = 25;
+
+// Pines para los botones
+const int botonColor  = 32; // B3: Selecciona color
+const int botonBrillo = 33; // B4: Cambia brillo
+
+// Configuración PWM
+const int freq = 5000;
+const int pwmChannelRed   = 0;
+const int pwmChannelGreen = 1;
+const int pwmChannelBlue  = 2;
+const int resolution = 8; // 8 bits: 0-255
+
+// Brillo
+const int nivelesBrillo = 4;
+const int valoresBrillo[nivelesBrillo] = {0, 85, 170, 255}; // 0%, 33%, 66%, 100%
+
+int colorSeleccionado = 0; // 0=Rojo, 1=Verde, 2=Azul
+int brillo[3] = {0, 0, 0}; // Índice de brillo para cada color
+
+void setup() {
+  Serial.begin(115200);
+
+  // Configura PWM para cada color
+  ledcSetup(pwmChannelRed, freq, resolution);
+  ledcAttachPin(pinRed, pwmChannelRed);
+
+  ledcSetup(pwmChannelGreen, freq, resolution);
+  ledcAttachPin(pinGreen, pwmChannelGreen);
+
+  ledcSetup(pwmChannelBlue, freq, resolution);
+  ledcAttachPin(pinBlue, pwmChannelBlue);
+
+  // Configura botones con resistencia interna pull-up
+  pinMode(botonColor, INPUT_PULLUP);
+  pinMode(botonBrillo, INPUT_PULLUP);
+
+  // Inicializa LED apagado
+  ledcWrite(pwmChannelRed, 0);
+  ledcWrite(pwmChannelGreen, 0);
+  ledcWrite(pwmChannelBlue, 0);
+
+  Serial.println("Listo para controlar LED RGB (cátodo común)");
+}
+
+void loop() {
+  static bool lastColorState  = HIGH;
+  static bool lastBrilloState = HIGH;
+
+  bool colorState  = digitalRead(botonColor);
+  bool brilloState = digitalRead(botonBrillo);
+
+  // Botón B3: Selección de color
+  if (lastColorState == HIGH && colorState == LOW) {
+    colorSeleccionado = (colorSeleccionado + 1) % 3;
+    Serial.print("Color seleccionado: ");
+    if (colorSeleccionado == 0) Serial.println("Rojo");
+    else if (colorSeleccionado == 1) Serial.println("Verde");
+    else Serial.println("Azul");
+    delay(200); // Antirrebote
+  }
+  lastColorState = colorState;
+
+  // Botón B4: Cambio de brillo
+  if (lastBrilloState == HIGH && brilloState == LOW) {
+    brillo[colorSeleccionado] = (brillo[colorSeleccionado] + 1) % nivelesBrillo;
+    Serial.print("Brillo ");
+    if (colorSeleccionado == 0) Serial.print("Rojo: ");
+    else if (colorSeleccionado == 1) Serial.print("Verde: ");
+    else Serial.print("Azul: ");
+    Serial.println(valoresBrillo[brillo[colorSeleccionado]]);
+    delay(200); // Antirrebote
+  }
+  lastBrilloState = brilloState;
+
+  // Actualiza PWM (cátodo común → valor directo)
+  ledcWrite(pwmChannelRed,   valoresBrillo[brillo[0]]);
+  ledcWrite(pwmChannelGreen, valoresBrillo[brillo[1]]);
+  ledcWrite(pwmChannelBlue,  valoresBrillo[brillo[2]]);
+}
